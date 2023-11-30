@@ -104,7 +104,7 @@ class ChatGPTSession(ChatSession):
             str(self.api_url),
             json=data,
             headers=headers,
-            timeout=None,
+            timeout=30,
         )
         r = r.json()
 
@@ -150,7 +150,7 @@ class ChatGPTSession(ChatSession):
             str(self.api_url),
             json=data,
             headers=headers,
-            timeout=None,
+            timeout=30,
         ) as r:
             content = []
             for chunk in r.iter_lines():
@@ -262,7 +262,7 @@ class ChatGPTSession(ChatSession):
             str(self.api_url),
             json=data,
             headers=headers,
-            timeout=None,
+            timeout=30,
         )
         r = r.json()
 
@@ -308,18 +308,22 @@ class ChatGPTSession(ChatSession):
             str(self.api_url),
             json=data,
             headers=headers,
-            timeout=None,
+            timeout=30,
         ) as r:
             content = []
             async for chunk in r.aiter_lines():
                 if len(chunk) > 0:
                     chunk = chunk[6:]  # SSE JSON chunks are prepended with "data: "
                     if chunk != "[DONE]":
-                        chunk_dict = orjson.loads(chunk)
-                        delta = chunk_dict["choices"][0]["delta"].get("content")
-                        if delta:
-                            content.append(delta)
-                            yield {"delta": delta, "response": "".join(content)}
+                        try:
+                            chunk_dict = orjson.loads(chunk)
+                        except orjson.JSONDecodeError:
+                            yield {"delta": "", "response": "".join(content)}
+                        else:
+                            delta = chunk_dict["choices"][0]["delta"].get("content")
+                            if delta:
+                                content.append(delta)
+                                yield {"delta": delta, "response": "".join(content)}
 
         # streaming does not currently return token counts
         assistant_message = ChatMessage(
